@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hacktivist Claims Tracker — Iran-Nexus & Pro-Russia</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f1117; font-family: 'IBM Plex Mono', 'Courier New', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e2535; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    input::placeholder { color: #4b5563; }
+    input:focus { outline: none; border-color: #4b9cd3 !important; }
+    tr:hover td { filter: brightness(1.12); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useMemo, useEffect } = React;
+
+    const TIER = {
+      "Almost Certainly Fabricated": { label:"FABRICATED",  bg:"#C0392B", text:"#fff", rowBg:"#fdf2f1", dot:"#C0392B" },
+      "Likely Exaggerated":          { label:"EXAGGERATED", bg:"#D35400", text:"#fff", rowBg:"#fdf6f0", dot:"#D35400" },
+      "Plausible but Unverified":    { label:"PLAUSIBLE",   bg:"#B7950B", text:"#fff", rowBg:"#fdfcf0", dot:"#B7950B" },
+      "Confirmed":                   { label:"CONFIRMED",   bg:"#1A7A43", text:"#fff", rowBg:"#f0faf4", dot:"#1A7A43" },
+    };
+
+    const ALIGN_COLORS = {
+      default:     { badge:"#60a5fa", border:"#1e4070" },
+      russia:      { badge:"#c084fc", border:"#4a1d6e" },
+      dual:        { badge:"#a78bfa", border:"#3a2d6e" },
+      financial:   { badge:"#94a3b8", border:"#374151" },
+    };
+
+    function getAC(a) {
+      const al = a.toLowerCase();
+      if (al.includes('russia') && al.includes('iran')) return ALIGN_COLORS.dual;
+      if (al.includes('russia')) return ALIGN_COLORS.russia;
+      if (al.includes('financial')) return ALIGN_COLORS.financial;
+      return ALIGN_COLORS.default;
+    }
+
+    function shortAlign(a) {
+      return a.replace('(MOIS/Void Manticore)','').replace('(state-aligned)','')
+              .replace('(hacktivist collective)','').replace('(botnet-for-hire)','')
+              .replace('(ideological RaaS)','').replace('(IRGC/Cotton Sandstorm)','').trim();
+    }
+
+    const TIER_ORDER = ["Almost Certainly Fabricated","Likely Exaggerated","Plausible but Unverified","Confirmed"];
+
+    function App() {
+      const [data, setData]         = useState([]);
+      const [loading, setLoading]   = useState(true);
+      const [error, setError]       = useState(null);
+      const [search, setSearch]     = useState("");
+      const [tierFilter, setTier]   = useState("All");
+      const [alignFilter, setAlign] = useState("All");
+      const [expandedId, setExp]    = useState(null);
+
+      useEffect(() => {
+        fetch('../data/claims.json')
+          .then(r => { if (!r.ok) throw new Error('Could not load claims.json'); return r.json(); })
+          .then(d => { setData(d); setLoading(false); })
+          .catch(e => { setError(e.message); setLoading(false); });
+      }, []);
+
+      const counts = useMemo(() => {
+        const c = {};
+        TIER_ORDER.forEach(t => { c[t] = data.filter(r => r.credibility_tier === t).length; });
+        return c;
+      }, [data]);
+
+      const filtered = useMemo(() => {
+        let d = [...data];
+        if (tierFilter !== "All") d = d.filter(r => r.credibility_tier === tierFilter);
+        if (alignFilter !== "All") d = d.filter(r => {
+          if (alignFilter === "Iran-Nexus") return r.alignment.includes("Iran-Nexus") && !r.alignment.includes("Russian");
+          if (alignFilter === "Pro-Russia") return r.alignment.includes("Russia");
+          if (alignFilter === "Dual") return r.alignment.includes("dual") || (r.alignment.includes("Iran") && r.alignment.includes("Russia"));
+          if (alignFilter === "Financial") return r.alignment.includes("Financial");
+          return true;
+        });
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          d = d.filter(r =>
+            r.group.toLowerCase().includes(q) || r.target.toLowerCase().includes(q) ||
+            r.country.toLowerCase().includes(q) || r.attack_type.toLowerCase().includes(q) ||
+            r.entity_type.toLowerCase().includes(q) || r.credibility_tier.toLowerCase().includes(q)
+          );
+        }
+        return d;
+      }, [data, tierFilter, alignFilter, search]);
+
+      const S = { fontFamily: "'IBM Plex Mono','Courier New',monospace" };
+
+      if (loading) return (
+        <div style={{...S, background:"#0f1117", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#64748b", fontSize:13}}>
+          Loading claims.json…
+        </div>
+      );
+      if (error) return (
+        <div style={{...S, background:"#0f1117", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#ef4444", fontSize:13, padding:40, textAlign:"center"}}>
+          <div>
+            <div style={{fontSize:16, fontWeight:700, marginBottom:8}}>Could not load data</div>
+            <div style={{color:"#94a3b8"}}>{error}</div>
+            <div style={{marginTop:12, color:"#64748b", fontSize:11}}>Make sure you're serving this from a web server (not file://). Try: <code style={{color:"#a78bfa"}}>python3 -m http.server 8080</code> in the repo root.</div>
+          </div>
+        </div>
+      );
+
+      return (
+        <div style={{...S, background:"#0f1117", minHeight:"100vh", color:"#e2e8f0"}}>
+
+          {/* Header */}
+          <div style={{background:"linear-gradient(135deg,#1a1f2e 0%,#0f1117 100%)", borderBottom:"2px solid #2d3748", padding:"20px 24px 16px"}}>
+            <div style={{fontSize:9, letterSpacing:"0.2em", color:"#64748b", marginBottom:4, fontWeight:700, textTransform:"uppercase"}}>
+              ◈ OSINT TRACKER · OPERATION EPIC FURY / ROARING LION CYBER DIMENSION
+            </div>
+            <h1 style={{margin:0, fontSize:20, fontWeight:800, color:"#f1f5f9", letterSpacing:"-0.01em"}}>
+              Iran-Nexus &amp; Pro-Russia Hacktivist Claims
+            </h1>
+            <div style={{fontSize:11, color:"#94a3b8", marginTop:4}}>
+              Feb 28 – Mar 3, 2026 · {data.length} claims · Compiled Mar 3, 2026
+            </div>
+
+            {/* Tier filter buttons */}
+            <div style={{marginTop:14, display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
+              {TIER_ORDER.map(t => {
+                const tc = TIER[t];
+                const active = tierFilter === t;
+                return (
+                  <button key={t} onClick={() => setTier(active ? "All" : t)}
+                    style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", borderRadius:4,
+                      background: active ? tc.bg : "#1e2535", border:`1px solid ${active ? tc.bg : "#374151"}`,
+                      color: active ? tc.text : "#9ca3af", cursor:"pointer", fontSize:10, fontWeight:700,
+                      letterSpacing:"0.08em", fontFamily:"inherit"}}>
+                    <span style={{width:8, height:8, borderRadius:"50%", background:tc.bg, display:"inline-block"}} />
+                    {tc.label}
+                    <span style={{background: active ? "rgba(255,255,255,0.2)" : "#374151", borderRadius:3, padding:"1px 5px", fontSize:10}}>
+                      {counts[t] || 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Alignment filter + search */}
+            <div style={{marginTop:10, display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
+              {[["All","All"],["Iran-Nexus","#1e4070"],["Pro-Russia","#4a1d6e"],["Dual","#3a2d6e"],["Financial","#374151"]].map(([k,border]) => (
+                <button key={k} onClick={() => setAlign(k)}
+                  style={{padding:"4px 9px", borderRadius:4,
+                    background: alignFilter===k ? border : "#1e2535",
+                    border:`1px solid ${alignFilter===k ? border : "#374151"}`,
+                    color: alignFilter===k ? "#fff" : "#9ca3af",
+                    cursor:"pointer", fontSize:10, fontWeight:700, letterSpacing:"0.06em", fontFamily:"inherit"}}>
+                  {k}
+                </button>
+              ))}
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search group, target, country…"
+                style={{background:"#1e2535", border:"1px solid #374151", borderRadius:6, padding:"6px 12px",
+                  color:"#e2e8f0", fontSize:11, fontFamily:"inherit", width:300}} />
+              <span style={{fontSize:11, color:"#64748b"}}>{filtered.length} / {data.length}</span>
+              {(tierFilter!=="All"||alignFilter!=="All") && (
+                <button onClick={() => { setTier("All"); setAlign("All"); }}
+                  style={{padding:"4px 9px", borderRadius:4, background:"transparent", border:"1px solid #C0392B",
+                    color:"#ef4444", cursor:"pointer", fontSize:10, fontFamily:"inherit"}}>✕ Clear</button>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%", borderCollapse:"collapse", fontSize:11}}>
+              <thead>
+                <tr style={{background:"#161b27", borderBottom:"2px solid #2d3748"}}>
+                  {["Hacktivist Group","Alignment","Attack Type","Entity Targeted","Type","Country","Date","Credibility Tier","Assessment","Sources",""].map(h => (
+                    <th key={h} style={{padding:"9px 12px", textAlign:"left", fontSize:9, fontWeight:700,
+                      color:"#64748b", letterSpacing:"0.12em", textTransform:"uppercase", whiteSpace:"nowrap"}}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr><td colSpan={11} style={{padding:40, textAlign:"center", color:"#64748b"}}>No results match your filters.</td></tr>
+                )}
+                {filtered.map((row, i) => {
+                  const tc = TIER[row.credibility_tier] || TIER["Plausible but Unverified"];
+                  const ac = getAC(row.alignment);
+                  const isExp = expandedId === row.id;
+                  const rowBg = isExp ? "#1a2030" : (i%2===0 ? "#0f1117" : "#12161f");
+                  return [
+                    <tr key={row.id} onClick={() => setExp(isExp ? null : row.id)}
+                      style={{background:rowBg, borderBottom:"1px solid #1e2535", cursor:"pointer"}}>
+                      <td style={{padding:"9px 12px", borderLeft:`3px solid ${tc.bg}`}}>
+                        <span style={{fontWeight:700, color:"#f1f5f9"}}>{row.group}</span>
+                      </td>
+                      <td style={{padding:"9px 12px"}}>
+                        <span style={{background:`${ac.border}55`, border:`1px solid ${ac.border}`,
+                          color:ac.badge, padding:"2px 7px", borderRadius:3, fontSize:9, fontWeight:700, whiteSpace:"nowrap"}}>
+                          {shortAlign(row.alignment)}
+                        </span>
+                      </td>
+                      <td style={{padding:"9px 12px", color:"#cbd5e1", maxWidth:160}}>{row.attack_type}</td>
+                      <td style={{padding:"9px 12px", color:"#f1f5f9", fontWeight:600, maxWidth:220}}>{row.target}</td>
+                      <td style={{padding:"9px 12px", color:"#94a3b8", fontSize:10, whiteSpace:"nowrap"}}>{row.entity_type}</td>
+                      <td style={{padding:"9px 12px", color:"#94a3b8", whiteSpace:"nowrap"}}>{row.country}</td>
+                      <td style={{padding:"9px 12px", color:"#94a3b8", whiteSpace:"nowrap"}}>{row.date}</td>
+                      <td style={{padding:"9px 12px"}}>
+                        <span style={{background:tc.bg, color:tc.text, padding:"3px 8px", borderRadius:4,
+                          fontSize:9, fontWeight:800, letterSpacing:"0.1em", whiteSpace:"nowrap"}}>
+                          {tc.label}
+                        </span>
+                      </td>
+                      <td style={{padding:"9px 12px", color:"#94a3b8", fontSize:10, maxWidth:300}}>
+                        <div style={{overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical"}}>
+                          {row.assessment}
+                        </div>
+                      </td>
+                      <td style={{padding:"9px 12px", color:"#64748b", fontSize:10, maxWidth:180}}>
+                        <div style={{overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical"}}>
+                          {row.sources}
+                        </div>
+                      </td>
+                      <td style={{padding:"9px 8px", textAlign:"center", color:"#475569", fontSize:10}}>
+                        {isExp ? "▲" : "▼"}
+                      </td>
+                    </tr>,
+                    isExp && (
+                      <tr key={`exp-${row.id}`} style={{background:"#141926", borderBottom:`2px solid ${tc.bg}44`}}>
+                        <td colSpan={11}>
+                          <div style={{borderLeft:`4px solid ${tc.bg}`, padding:"16px 20px",
+                            display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:20}}>
+                            <div>
+                              <div style={{fontSize:9, color:"#64748b", letterSpacing:"0.15em", textTransform:"uppercase", marginBottom:8, fontWeight:700}}>CREDIBILITY ASSESSMENT</div>
+                              <span style={{background:tc.bg, color:tc.text, padding:"4px 10px", borderRadius:4, fontSize:10, fontWeight:800, display:"inline-block", marginBottom:10}}>
+                                {row.credibility_tier}
+                              </span>
+                              <div style={{fontSize:11, color:"#cbd5e1", lineHeight:1.6}}>{row.assessment}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:9, color:"#64748b", letterSpacing:"0.15em", textTransform:"uppercase", marginBottom:8, fontWeight:700}}>CLAIM DETAILS</div>
+                              <table style={{width:"100%", fontSize:10}}>
+                                {[["Group",row.group],["Alignment",row.alignment],["Attack Type",row.attack_type],
+                                  ["Entity Type",row.entity_type],["Country",row.country],
+                                  ["Date",row.date],["Verified",row.independently_verified]].map(([k,v]) => (
+                                  <tr key={k}>
+                                    <td style={{color:"#64748b", padding:"2px 8px 2px 0", whiteSpace:"nowrap", fontWeight:700}}>{k}</td>
+                                    <td style={{color:"#e2e8f0"}}>{v}</td>
+                                  </tr>
+                                ))}
+                              </table>
+                            </div>
+                            <div>
+                              <div style={{fontSize:9, color:"#64748b", letterSpacing:"0.15em", textTransform:"uppercase", marginBottom:8, fontWeight:700}}>SOURCE ATTRIBUTION</div>
+                              {row.sources.split(";").map((s,i) => (
+                                <div key={i} style={{display:"flex", gap:6, marginBottom:4, fontSize:11, color:"#94a3b8"}}>
+                                  <span style={{color:"#475569"}}>▸</span>{s.trim()}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  ];
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div style={{background:"#0a0d14", borderTop:"1px solid #1e2535", padding:"14px 24px", marginTop:20}}>
+            <div style={{fontSize:9, color:"#475569", lineHeight:1.8}}>
+              <span style={{color:"#f59e0b", fontWeight:800}}>⚠ DATA CAVEAT</span>{" "}
+              Most claims are unverified self-reports from hacktivist Telegram channels and X/Twitter posts.
+              Credibility assessments reflect analyst judgments from Unit 42, Flashpoint, Check Point, Sophos X-Ops,
+              CrowdStrike, Hudson Rock, SOCRadar, Halcyon RRC, Truesec, CloudSEK, and social intel from
+              @FalconFeedsio · @H4ckmanac · @Cyberknow20.
+              For situational awareness only — not for attribution without independent confirmation.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
