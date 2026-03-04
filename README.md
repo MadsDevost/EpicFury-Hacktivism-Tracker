@@ -3,7 +3,7 @@
 
 > **Coverage period:** Feb 28 – Mar 3, 2026 &nbsp;·&nbsp; **50 claims tracked** &nbsp;·&nbsp; Compiled Mar 3, 2026
 
-A fully open, editable threat-intelligence tracker for pro-Iran and pro-Russia hacktivist claims following the US-Israel strikes on Iran (Operation Epic Fury / Operation Roaring Lion). Includes an **interactive React web app** and a **Python PDF generator** — both driven by a single shared `claims.json` dataset.
+I created this because I got sick of monitoring multiple feeds and trying to combine them into one clear dataset just to  track whether the wave of primarily exaggerated/fabricated claims would shift targeting away from the Gulf Region and towards the US. A fully open, editable threat-intelligence tracker for pro-Iran and pro-Russia hacktivist claims following the US-Israel strikes on Iran (Operation Epic Fury / Operation Roaring Lion). Includes an **interactive React web app** and a **Python PDF generator** — both driven by a single shared `claims.json` dataset.
 
 ---
 
